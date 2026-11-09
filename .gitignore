@@ -1,0 +1,21 @@
+# Build output
+/target
+**/*.rs.bk
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Node modules (if any)
+/node_modules
+**/node_modules/
+
+# Editor configs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Network backups (contain private IP/routes/DNS config)
+network-backup-*
