@@ -231,10 +231,6 @@ dig @127.0.0.1 -p 53 www.speedtest.net +time=3 +tries=1
 ps aux | grep dns-adblocker | awk '{printf "%.0fMB\n", $6/1024}'
 ```
 
-## Licencia
-
-MIT
-
 ## Author
 
 luxder
