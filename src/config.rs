@@ -3,6 +3,16 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use tracing::info;
 
+pub fn default_filter_urls() -> Vec<String> {
+    vec![
+        "https://easylist-downloads.adblockplus.org/easylist.txt".to_string(),
+        "https://easylist-downloads.adblockplus.org/easyprivacy.txt".to_string(),
+        "https://easylist-downloads.adblockplus.org/easylistcookie.txt".to_string(),
+        "https://easylist-downloads.adblockplus.org/fanboy-annoyance.txt".to_string(),
+        "https://easylist-downloads.adblockplus.org/fanboy-social.txt".to_string(),
+    ]
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default = "default_port")]
@@ -15,6 +25,8 @@ pub struct Config {
     pub blocked_domain_ip: Ipv4Addr,
     #[serde(default = "default_refresh_hours")]
     pub refresh_hours: u64,
+    #[serde(default = "default_filter_urls")]
+    pub filter_urls: Vec<String>,
 }
 
 impl Config {
@@ -64,6 +76,7 @@ impl Default for Config {
             filter_lists_dir: config_dir.join("filter_lists"),
             blocked_domain_ip: default_blocked_ip(),
             refresh_hours: default_refresh_hours(),
+            filter_urls: default_filter_urls(),
         }
     }
 }

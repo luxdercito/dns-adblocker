@@ -34,11 +34,14 @@ async fn main() -> Result<()> {
 
     let config = Config::load(&config_path).await?;
 
-    info!("Configuration loaded: bind_port={}, upstream={:?}",
-          config.bind_port, config.upstream_dns);
+    info!("Configuration loaded: bind_port={}, upstream={:?}, filter_urls={}",
+          config.bind_port, config.upstream_dns, config.filter_urls.len());
 
-    let filter_manager = FilterListManager::new(config.filter_lists_dir.clone()).await;
-    filter_manager.initialize().await;
+    // Create the manager with dynamic URLs from config
+    let filter_manager = FilterListManager::new(
+        config.filter_lists_dir.clone(),
+        config.filter_urls.clone(),
+    ).await;
 
     let server = DnsAdBlockerServer::new(&config);
 

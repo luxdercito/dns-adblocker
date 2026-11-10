@@ -1,9 +1,8 @@
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use anyhow::{Context, Result};
 use tokio::net::UdpSocket;
-use tokio::sync::oneshot;
 use tracing::{info, warn};
 
 pub struct DnsAdBlockerServer {
@@ -34,7 +33,14 @@ impl DnsAdBlockerServer {
             .map(|s| s.parse())
             .collect::<Result<Vec<_>, _>>()?;
 
-        let fm_sender = filter_manager.sender.clone();
+        let fm = Arc::new(filter_manager);
+
+        // Wait for the engine to be initialized before serving queries
+        let fm_wait = fm.clone();
+        tokio::spawn(async move {
+            fm_wait.wait_initialized().await;
+            info!("DNS AdBlocker engine ready, starting to serve queries");
+        });
 
         let socket_recv = socket.clone();
         tokio::spawn(async move {
@@ -45,11 +51,11 @@ impl DnsAdBlockerServer {
                         // Only process valid DNS queries (QR=0 means standard query)
                         if len < 12 || (buf[2] & 0x80) != 0 { continue; }
                         let query_bytes = buf[..len].to_vec();
-                        let sender = fm_sender.clone();
+                        let fm = fm.clone();
                         let ups = upstreams.clone();
                         let socket_send = socket_recv.clone();
                         tokio::spawn(async move {
-                            match handle_query(query_bytes, sender, ups).await {
+                            match handle_query(query_bytes, fm, ups).await {
                                 Ok(resp) => {
                                     let _ = socket_send.send_to(&resp, addr).await;
                                 }
@@ -74,22 +80,14 @@ impl DnsAdBlockerServer {
 /// original query to an upstream resolver.
 async fn handle_query(
     query_bytes: Vec<u8>,
-    sender: Arc<Mutex<std::sync::mpsc::Sender<crate::filter_lists::EngineMsg>>>,
+    filter_manager: Arc<crate::filter_lists::FilterListManager>,
     upstreams: Vec<SocketAddr>,
 ) -> Result<Vec<u8>> {
     let domain = extract_domain(&query_bytes);
 
-    // Ask the engine worker whether this domain is blocked
+    // Ask the engine worker whether this domain is blocked (async, no blocking sleep)
     let is_blocked = if !domain.is_empty() {
-        let (reply_tx, reply_rx) = oneshot::channel();
-        {
-            let tx = sender.lock().unwrap();
-            let _ = tx.send(crate::filter_lists::EngineMsg::IsBlocked {
-                domain: domain.clone(),
-                reply_tx,
-            });
-        }
-        reply_rx.await.unwrap_or(false)
+        filter_manager.is_blocked(&domain).await
     } else {
         false
     };
